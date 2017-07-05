@@ -1,0 +1,8 @@
+Part 4
+25 instructions * 2 cycles = 50 cycles , so
+execution time = 12.5 ns * 50 cycles = [625 ns] 
+intrusiveness = .0084%
+
+Part 5
+(1.65-1.57)s = 0.08s
+

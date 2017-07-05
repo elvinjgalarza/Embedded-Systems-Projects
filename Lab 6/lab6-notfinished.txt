@@ -1,0 +1,126 @@
+void Sound_Init(uint32_t period){
+	DAC_Init();
+	NVIC_ST_CTRL_R = 0;
+	NVIC_ST_RELOAD_R = period -1;
+	NVIC_ST_CURRENT_R = 0;
+	NVIC_SYS_PRI3_R = (NVIC_SYS_PRI3_R&0x00FFFFFF)|0x20000000; 
+  NVIC_ST_CTRL_R = 0x0007; 								// enable SysTick with core clock and interrupts
+	
+}
+
+
+// **************Sound_Play*********************
+// Start sound output, and set Systick interrupt period 
+// Input: interrupt period
+//           Units to be determined by YOU
+//           Maximum to be determined by YOU
+//           Minimum to be determined by YOU
+//         input of zero disable sound output
+// Output: none
+	const unsigned char SineWave[16] = {4,5,6,7,7,7,6,5,4,3,2,1,1,1,2,3};
+	unsigned int Index=0;           // Index varies from 0 to 15
+	
+	 void SysTick_Handler(void){
+		GPIO_PORTF_DATA_R ^= 0x02;
+		Index = (Index+1)&0x0F;      
+		DAC_Out(SineWave[Index]);    // output one value each interrupt
+		}
+	
+void Sound_Play(uint32_t period){
+
+}
+
+
+
+
+void Piano_Init(void){
+	unsigned long volatile delay;
+	SYSCTL_RCGC2_R |= 0x01;					//activate PortA clock
+	delay = SYSCTL_RCGC2_R;
+	
+	GPIO_PORTA_DIR_R &= 0xE3;				// sets PA2-PA4 as inputs
+	GPIO_PORTA_DEN_R |= 0x3C;
+	GPIO_PORTA_AFSEL_R &= 0xE3;
+}
+
+// **************Piano_In*********************
+// Input from piano key inputs 
+// Input: none 
+// Output: 0 to 7 depending on keys
+// 0x01 is just Key0, 0x02 is just Key1, 0x04 is just Key2
+uint32_t Piano_In(void){
+  return GPIO_PORTA_DATA_R; // replace this line with actual code
+}
+
+void DAC_Init(void){
+	unsigned long volatile delay;
+	SYSCTL_RCGC2_R |= 0x30;					//activate PortE & F clock
+	delay = SYSCTL_RCGC2_R;
+	
+	GPIO_PORTE_DIR_R |= 0x0F;				// sets PE0-PE3 as outputs
+	GPIO_PORTE_DEN_R |= 0x0F;
+	GPIO_PORTE_AFSEL_R &= ~0x0F;
+	
+	GPIO_PORTF_DIR_R |= 0x02;				//sets PF1 as output
+	GPIO_PORTF_DEN_R |= 0x02;
+	GPIO_PORTE_AFSEL_R &= ~0x02;
+}
+
+// **************DAC_Out*********************
+// output to DAC
+// Input: 4-bit data, 0 to 15 
+// Output: none
+void DAC_Out(uint32_t data){
+	GPIO_PORTE_DATA_R = data;
+}
+
+
+#include <stdint.h>
+#include "tm4c123gh6pm.h"
+#include "Sound.h"
+#include "Piano.h"
+#include "TExaS.h"
+#include "dac.h"
+
+// basic functions defined at end of startup.s
+void DisableInterrupts(void); // Disable interrupts
+void EnableInterrupts(void);  // Enable interrupts
+
+
+int main(void){      
+  TExaS_Init(SW_PIN_PE3210,DAC_PIN_PB3210,ScopeOn);    // bus clock at 80 MHz
+  Piano_Init();
+  Sound_Init(50000);
+	DAC_Init();
+  // other initialization
+  EnableInterrupts();
+	unsigned long previous = 0;
+	unsigned long input;
+	unsigned long input1;
+	unsigned long input2;
+  while(1){
+		input = Piano_In()&0x04;
+		input1 = Piano_In()&0x08;
+		input2 = Piano_In()&0x01;
+		
+		if(previous&&(input==0)){
+			DisableInterrupts();
+		}
+		
+		if(input&&(previous==0)){
+			EnableInterrupts();
+			Sound_Init(50000);
+		}
+		
+		if(input1&&(previous==0)){
+			EnableInterrupts();
+			Sound_Init(20000);
+		}
+		
+		if(input2&&(previous==0)){
+			EnableInterrupts();
+			Sound_Init(10000);
+		}
+		previous = input;
+  }         
+}
